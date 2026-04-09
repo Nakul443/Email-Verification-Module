@@ -6,7 +6,8 @@
 import type { Request, Response } from "express";
 import { isValidSyntax, extractDomain } from "../utils/validator.js";
 import { getDidYouMean } from "../services/typoService.js";
-import { getMxRecords, checkMailbox } from "../services/smtpService.js";
+// Changed: Using the smtpService object to allow for easier testing/mocking in ESM
+import { smtpService } from "../services/smtpService.js";
 
 // for the email verification request
 // combines all the stuff: syntax, typo, DNS, and SMTP checks.
@@ -43,11 +44,23 @@ export const verifyEmailHandler = async (
       return;
     }
 
+    // NEW: Priority Typo Check
+    // If syntax is valid, but the domain looks like a typo, stop here.
+    const typoSuggestion = getDidYouMean(email);
+    if (typoSuggestion) {
+      resultData.domain = extractDomain(email);
+      resultData.didyoumean = typoSuggestion;
+      resultData.subresult = "typo_detected";
+      res.json(finalize(resultData, startTime));
+      return;
+    }
+
     const domain = extractDomain(email);
     resultData.domain = domain;
 
     // DNS MX Lookup
-    const mxRecords = await getMxRecords(domain);
+    // Updated to use the smtpService object
+    const mxRecords = await smtpService.getMxRecords(domain);
     resultData.mxRecords = mxRecords;
 
     if (mxRecords.length === 0) {
@@ -61,16 +74,17 @@ export const verifyEmailHandler = async (
 
     // SMTP Verification
     // trying the highest priority MX record
-    const smtpCheck = await checkMailbox(email, mxRecords[0]!);
+    // Updated to use the smtpService object
+    const smtpCheck = await smtpService.checkMailbox(email, mxRecords[0]!);
 
     if (smtpCheck.exists) {
       resultData.result = "valid";
       resultData.resultcode = 1;
       resultData.subresult = "mailbox_exists";
     } else {
-      resultData.result =
-        smtpCheck.subresult === "greylisted" ? "unknown" : "invalid";
-      resultData.resultcode = smtpCheck.subresult === "greylisted" ? 3 : 6;
+      const isHardBounce = smtpCheck.subresult === "mailbox_does_not_exist";
+      resultData.result = isHardBounce ? "invalid" : "unknown";
+      resultData.resultcode = isHardBounce ? 6 : 3;
       resultData.subresult = smtpCheck.subresult;
       resultData.error = smtpCheck.error || null;
     }

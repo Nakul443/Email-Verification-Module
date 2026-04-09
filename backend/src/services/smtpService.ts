@@ -83,3 +83,8 @@ export const checkMailbox = async (
     });
   });
 };
+
+export const smtpService = {
+  getMxRecords,
+  checkMailbox
+};

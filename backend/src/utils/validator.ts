@@ -14,7 +14,8 @@ export const isValidSyntax = (email: string): boolean => {
   // user@domain format
   // rejects consecutive dots (e.g., user..name@domain.com)
   // rejects leading/trailing dots in labels
-  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+  // Added (?!\\.) at the start to ensure local part doesn't start with a dot
+  const emailRegex = /^(?!\.)[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
 
   return emailRegex.test(email);
 };
